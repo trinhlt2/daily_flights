@@ -1,0 +1,125 @@
+---
+title: "10_Load_Data"
+output: html_notebook
+---
+
+# What affects the number of daily flights?
+
+First, load in important libraries
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(modelr)
+```
+
+## Load in flights and related data
+
+Using Import Dataset > from text (readr) > Fix data units > unchoose open view > copy code > cancel > copy > Code / reformat code > code / reindent lines
+
+```{r}
+library(readr)
+flights <-
+  read_csv(
+    "Data/flights.csv",
+    col_types = cols(
+      air_time = col_integer(),
+      arr_delay = col_integer(),
+      arr_time = col_integer(),
+      day = col_integer(),
+      dep_delay = col_integer(),
+      dep_time = col_integer(),
+      distance = col_integer(),
+      flight = col_character(),
+      hour = col_integer(),
+      minute = col_integer(),
+      month = col_integer(),
+      sched_arr_time = col_integer(),
+      sched_dep_time = col_integer(),
+      year = col_integer()
+    )
+  )
+```
+
+## What is the flight volume by day?
+
+There is no well-formatted data time filed for the departures. I will need to create a new column to be used throughout the analysis which mutates the current encoding. 
+
+```{r}
+daily <- flights %>%
+  mutate(date = make_date(year, month, day)) %>%
+  group_by(date) %>%
+  summarize (n = n()) %>%
+  arrange(desc(n))
+daily
+```
+
+Busiest day was the day before Thanksgiving
+
+```{r}
+daily <- flights %>%
+  mutate(date = make_date(year, month, day)) %>%
+  group_by(date) %>%
+  summarize (n = n()) %>%
+  arrange(n)
+daily
+```
+
+Least travelled day was the day of Thanksgiving. 
+
+Let's graph the time series of the number of flights.
+
+```{r}
+ggplot (data = daily) + 
+  geom_line(mapping = aes (x = date, y = n))
+
+```
+
+Or 
+
+```{r}
+daily %>%
+  ggplot(mapping = aes(x = date, y = n)) +
+  geom_line()
+```
+
+Spikes, drops in volume might be day of week
+
+We need an analysis of the distribution of flights by the day of week. 
+
+We need to indicate day of week in dataframe.
+
+```{r}
+daily <- daily %>% 
+  mutate(wday = wday(date, label = TRUE))
+  
+```
+
+Plot distribution of flights by day of the week 
+
+```{r}
+daily %>%
+  ggplot(mapping = aes (wday, n)) +
+  geom_boxplot()
+```
+
+Remove the effect of the day of week. I will fit a linear regression model and graph the residuals.
+
+Lm is linear model (fit n based on the day of the week)
+
+```{r}
+mod <- lm(n ~ wday, data = daily)
+daily <- daily %>%
+  add_residuals(mod)
+```
+
+Now plot the residuals. 
+
+```{r}
+daily %>%
+  ggplot (mapping = aes (date, resid)) +
+  geom_line() + 
+  geom_smooth()
+```
+
